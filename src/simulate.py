@@ -18,6 +18,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import datetime
 import os
+import json
+import pandas as pd
 
 # --- Importation de l’algorithme MusRank ---
 from musrank_strategy import musrank
@@ -36,6 +38,24 @@ def create_test_graph():
         ("A2", "P1"), ("A2", "P3"),
         ("A3", "P2"), ("A4", "P3"),
     ])
+    return G
+
+def load_bipartite_json(path):
+    """Charge un réseau biparti à partir d’un fichier JSON"""
+    with open(path) as f:
+        data = json.load(f)
+
+    G = nx.Graph()
+    for node in data["nodes"]:
+        node_id = int(node["nodeid"])
+        group = node.get("group", "").lower()
+        if "herbivore" in group or "pollinator" in group:
+            bip = 0  # ensemble actif
+        else:
+            bip = 1  # ensemble passif
+        G.add_node(node_id, bipartite=bip, label=node["name"])
+    for link in data["links"]:
+        G.add_edge(int(link["source"]), int(link["target"]))
     return G
 
 
@@ -110,10 +130,11 @@ def evaluate_robustness(G, scores):
 # 4. Fonction principale : simulation de toutes les stratégies
 # =====================================================
 
-def simulate_all(G, strategies_to_test=None):
+def simulate_all(G, strategies_to_test=None, dataset_name="network"):
     """
     Exécute la simulation pour toutes les stratégies spécifiées.
     Si aucune stratégie n’est donnée, toutes les stratégies disponibles seront testées.
+    Chaque figure est enregistrée avec le nom du dataset (pour éviter l’écrasement).
     """
     available_strategies = {
         "random": random_strategy,
@@ -154,29 +175,22 @@ def simulate_all(G, strategies_to_test=None):
     plt.legend()
     plt.grid(True)
 
-    # Forcer les graduations de l’axe X à être des entiers
+    # Forcer les graduations de l’axe X à être lisibles (éviter le chevauchement)
     max_len = max(len(v) for v in results.values())
-    plt.xticks(range(max_len))
+    step = max(1, max_len // 10)  # environ 10 graduations
+    plt.xticks(range(0, max_len, step))
 
     # =====================================================
-    # Sauvegarde automatique dans le dossier 'report/'
-    # (avec chemin absolu pour éviter les erreurs de dossier)
+    # Sauvegarde automatique dans le dossier 'tests/results'
     # =====================================================
 
-    # Déterminer le chemin absolu du dossier actuel (src)
     base_dir = os.path.dirname(os.path.abspath(__file__))
-
-    # Construire le chemin du dossier 'report' à la racine du projet
     report_dir = os.path.join(base_dir, "..", "tests", "results")
-
-    # Créer le dossier s’il n’existe pas
     os.makedirs(report_dir, exist_ok=True)
 
-    # Nom du fichier avec date et heure
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = os.path.join(report_dir, "LCC_comparison.png")
+    filename = os.path.join(report_dir, f"LCC_comparison_{dataset_name}.png")
 
-    # Sauvegarder la figure
     plt.savefig(filename, dpi=300)
     print(f"Figure enregistrée dans {filename}")
 
@@ -184,10 +198,76 @@ def simulate_all(G, strategies_to_test=None):
 
 
 # =====================================================
-# 6. Point d’entrée du programme
+# 6. Simulation MusRank + Sauvegarde CSV
 # =====================================================
+def simulate_musrank_and_save(G, network_name, save_dir="tests/results/musrank_analysis"):
+    """Simule la suppression selon MusRank et sauvegarde le CSV."""
+    scores = musrank(G)
+    G0 = G.copy()
+    Gc = G.copy()
+    os.makedirs(save_dir, exist_ok=True)
+    active_nodes = [n for n, d in G.nodes(data=True) if d.get('bipartite') == 0]
+    order = sorted(active_nodes, key=scores.get, reverse=True)
+    records = []
+    removed_primary = 0
 
+    for step, node in enumerate(order, start=1):
+        if node not in Gc:
+            continue
+        Gc.remove_node(node)
+        removed_primary += 1
+        # secondary extinctions
+        zeros = [n for n in list(Gc.nodes()) if Gc.degree(n) == 0]
+        removed_secondary = len(zeros)
+        Gc.remove_nodes_from(zeros)
+        # LCC
+        if Gc.number_of_nodes() == 0:
+            lcc_ratio = 0
+        else:
+            Gu = Gc.to_undirected()
+            largest = max((len(c) for c in nx.connected_components(Gu)), default=0)
+            lcc_ratio = largest / G0.number_of_nodes()
+        frac_primary = removed_primary / len(active_nodes)
+        records.append({
+            "step": step,
+            "removed_node": node,
+            "removed_primary": removed_primary,
+            "removed_secondary_count": removed_secondary,
+            "removed_fraction_primary": frac_primary,
+            "lcc_ratio": lcc_ratio,
+            "strategy": "MUSRANK",
+            "network": network_name
+        })
+
+    df = pd.DataFrame(records)
+    csv_path = os.path.join(save_dir, f"{network_name}_MUSRANK_removal.csv")
+    df.to_csv(csv_path, index=False)
+    print(f" CSV sauvegardé : {csv_path}")
+    return df
+
+# =====================================================
+# 7. Point d’entrée du programme
+# =====================================================
 if __name__ == "__main__":
-    G = create_test_graph()
-    # Pour l’instant, tester uniquement MusRank
-    simulate_all(G, strategies_to_test=["musrank"])
+    # Déterminer le chemin du dossier des tests
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    tests_dir = os.path.join(base_dir, "..", "tests")
+
+    # Charger les deux réseaux JSON
+    G_prunus = load_bipartite_json(os.path.join(tests_dir, "network_prunus.json"))
+    G_pollinator = load_bipartite_json(os.path.join(tests_dir, "network_pollinator.json"))
+
+    # Exécuter les simulations (pour l’instant uniquement MusRank)
+    print(">>> Simulation sur le réseau PRUNUS (petit réseau)")
+    simulate_all(G_prunus, strategies_to_test=["musrank"], dataset_name="prunus")
+
+    print("\n>>> Simulation sur le réseau POLLINATOR (grand réseau)")
+    simulate_all(G_pollinator, strategies_to_test=["musrank"], dataset_name="pollinator")
+
+    # =====================================================
+    # Ajout : génération des CSV MusRank
+    # =====================================================
+    print("\n>>> Sauvegarde des résultats MusRank au format CSV")
+    simulate_musrank_and_save(G_prunus, "Prunus")
+    simulate_musrank_and_save(G_pollinator, "Pollinator")
+
