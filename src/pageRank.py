@@ -1,8 +1,10 @@
 from typing import Dict, List
 
 import networkx as nx 
+__all__ = ["pageRank"]  
 
-def SPARSEMATVECTPROD(T: Dict[str, Dict[str, float]], X: Dict[str, float]) -> Dict[str, float]:
+
+def multiply_sparse_matrix_vector(T: Dict[str, Dict[str, float]], X: Dict[str, float]) -> Dict[str, float]:
     """
     Sparse matrix × vector product.
     - T[i][j] = 1/out_degree(j) if j→i, else not stored (0)
@@ -15,9 +17,9 @@ def SPARSEMATVECTPROD(T: Dict[str, Dict[str, float]], X: Dict[str, float]) -> Di
     return U
 
 
-def NORMALIZE(X: Dict[str, float]) -> Dict[str, float]:
+def normalize(X: Dict[str, float]) -> Dict[str, float]:
     """
-    Normalize vector so that sum(X) = 1.
+    normalize vector so that sum(X) = 1.
     Equivalent to X[i] = X[i] / sum(X.values()).
     """
     total = sum(X.values())
@@ -26,7 +28,7 @@ def NORMALIZE(X: Dict[str, float]) -> Dict[str, float]:
     return {i: X[i] / total for i in X}
 
 
-def POWERITERATION(graph: Dict[str, List[str]], t: int = 100, s: float = 0.15) -> Dict[str, float]:
+def pageRank(graph: Dict[str, List[str]], t: int = 100, s: float = 0.15) -> Dict[str, float]:
     """
     PageRank power iteration algorithm
     graph: adjacency list (u → [v1, v2, ...])
@@ -53,11 +55,11 @@ def POWERITERATION(graph: Dict[str, List[str]], t: int = 100, s: float = 0.15) -
 
     # 幂迭代
     for _ in range(t):
-        prod = SPARSEMATVECTPROD(T, X)
+        prod = multiply_sparse_matrix_vector(T, X)
         # 更新 + 蒸发项
         X = {i: (1 - s) * prod[i] + s * I[i] for i in nodes}
         # 归一化，防止误差累积
-        X = NORMALIZE(X)
+        X = normalize(X)
 
     return X
 
@@ -126,7 +128,7 @@ def test():
 
     # ===== 3. 调用 PageRank 算法 =====
     print("\n📈 PageRank algorithm results:")
-    pagerank_scores = POWERITERATION(graph, t=100, s=0.15)
+    pagerank_scores = pageRank(graph, t=100, s=0.15)
     for node, score in pagerank_scores.items():
         print(f"  {node}: {score:.4f}")
 
@@ -149,7 +151,7 @@ def test():
     # 测试 PageRank
     #   注意 PageRank 是针对整张图（有向或无向）计算的
     graph_dict = {u: list(G.neighbors(u)) for u in G.nodes()}
-    pagerank_scores = POWERITERATION(graph_dict)
+    pagerank_scores = pageRank(graph_dict)
     print("PageRank:", list(pagerank_scores.items())[:5])
 
 
