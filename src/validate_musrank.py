@@ -20,6 +20,7 @@ import os
 import json
 from scipy.stats import spearmanr
 from musrank_strategy import musrank
+import pandas as pd
 
 
 # =====================================================
@@ -110,7 +111,6 @@ def plot_convergence(G, dataset_name="network"):
     plt.grid(True, alpha=0.3, linestyle="--")
     plt.tight_layout()
     save_current_figure(fig, "convergence", dataset_name)
-    plt.show()
     plt.close(fig)
 
 
@@ -146,7 +146,6 @@ def plot_scores_distribution(G, dataset_name="network"):
 
     plt.tight_layout()
     save_current_figure(fig, "distribution", dataset_name)
-    plt.show()
     plt.close(fig)
 
 
@@ -170,7 +169,6 @@ def compare_initializations(G, dataset_name="network"):
     plt.grid(True, alpha=0.3, linestyle="--")
     plt.tight_layout()
     save_current_figure(fig, "spearman", dataset_name)
-    plt.show()
     plt.close(fig)
 
 
@@ -201,7 +199,6 @@ def plot_IV_relationship(G, dataset_name="network"):
     plt.grid(True, alpha=0.3, linestyle="--")
     plt.tight_layout()
     save_current_figure(fig, "iv_relationship", dataset_name)
-    plt.show()
     plt.close(fig)
 
 
@@ -209,24 +206,65 @@ def plot_IV_relationship(G, dataset_name="network"):
 # 8. Test de robustesse simple (LCC)
 # =====================================================
 def robustness_curve(G, dataset_name="network"):
+    """
+    Trace la courbe d’extinction MusRank avec zone AUC ombrée
+    et sauvegarde automatique (en écrasant l’ancienne figure).
+    """
     from simulate import evaluate_robustness
     scores = musrank(G)
     lcc = evaluate_robustness(G, scores)
     x = np.arange(len(lcc)) / len(lcc)
+    y = lcc / len(G)
 
-    fig = plt.figure(figsize=(6, 4))
-    plt.plot(x, lcc / len(G), marker='o')
-    plt.xlabel("Fraction de nœuds supprimés (actifs)")
-    plt.ylabel("LCC relative")
-    plt.title(f"Robustesse MusRank ({dataset_name})")
-    plt.grid(True, alpha=0.3, linestyle="--")
+    # --- Calcul de l’AUC ---
+    auc = np.trapz(y, x)
+
+    # --- Création de la figure ---
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(x, y, marker='o', color='#1f77b4', label='LCC relative')
+    ax.fill_between(x, y, 0, color='#1f77b4', alpha=0.2, label=f'AUC = {auc:.3f}')
+    ax.set_xlabel("Fraction de nœuds supprimés (actifs)")
+    ax.set_ylabel("LCC relative")
+    ax.set_title(f"Robustesse MusRank ({dataset_name})")
+    ax.grid(True, alpha=0.3, linestyle='--')
+    ax.legend()
     plt.tight_layout()
-    save_current_figure(fig, "robustesse", dataset_name)
-    plt.show()
-    plt.close(fig)
 
-    auc = np.trapz(lcc / len(G), x)
+    # --- Sauvegarde automatique (écrase l’ancienne) ---
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    save_dir = os.path.join(base_dir, "..", "tests", "results", "musrank_analysis")
+    os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, f"robustesse_{dataset_name.lower()}.png")
+    fig.savefig(save_path, dpi=300, bbox_inches='tight')
+    print(f"Figure sauvegardée : {save_path}")
+
+    plt.close(fig)
     print(f"AUC (robustesse) = {auc:.4f}")
+
+
+def summarize_auc(networks):
+    """
+    Calcule et sauvegarde les AUC pour plusieurs réseaux.
+    networks : dict {nom: graphe}
+    """
+    from simulate import evaluate_robustness
+    records = []
+
+    for name, G in networks.items():
+        scores = musrank(G)
+        lcc = evaluate_robustness(G, scores)
+        x = np.arange(len(lcc)) / len(lcc)
+        auc = np.trapz(lcc / len(G), x)
+        records.append({"Network": name, "AUC_Robustesse": round(auc, 4)})
+
+    df = pd.DataFrame(records)
+    save_dir = os.path.join(os.path.dirname(__file__), "..", "tests", "results", "musrank_analysis")
+    os.makedirs(save_dir, exist_ok=True)
+    csv_path = os.path.join(save_dir, "AUC_summary.csv")
+    df.to_csv(csv_path, index=False)
+    print(f" Tableau des AUC sauvegardé : {csv_path}")
+    print(df.to_string(index=False))
+
 
 
 # =====================================================
@@ -252,3 +290,8 @@ if __name__ == "__main__":
     compare_initializations(G_pollinator, "Pollinator")
     plot_IV_relationship(G_pollinator, "Pollinator")
     robustness_curve(G_pollinator, "Pollinator")
+    summarize_auc({
+        "Prunus": G_prunus,
+        "Pollinator": G_pollinator
+    })
+
