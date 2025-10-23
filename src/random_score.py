@@ -1,4 +1,5 @@
 import random 
+from typing import Dict
 import networkx as nx 
 
 __all__ = ["score_random"]  
