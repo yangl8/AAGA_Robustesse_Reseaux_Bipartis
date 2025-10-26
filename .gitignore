@@ -210,3 +210,7 @@ __marimo__/
 __pycache__/
 *.py[cod]
 .venv/
+
+# 忽略自动生成的结果文件
+tests/results/*.csv
+
