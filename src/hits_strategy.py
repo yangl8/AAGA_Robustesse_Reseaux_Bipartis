@@ -11,7 +11,7 @@ def _active_nodes(G):
     return [n for n, d in G.nodes(data=True) if _is_active(d)]
 
 def _passive_nodes(G):
-    # 另一侧：type=='passive' 或 bipartite==1
+    # Other side: type=='passive' or bipartite==1
     res = []
     for n, d in G.nodes(data=True):
         t = d.get("type")
@@ -23,7 +23,7 @@ def _passive_nodes(G):
                 res.append(n)
     return res
 
-# 1) 调用库版本（networkx.hits）
+# 1) Library version (networkx.hits)
 def hits_strategy(G) -> dict:
     """
     HITS hub scores for active nodes: {node: hub_score}.
@@ -34,20 +34,20 @@ def hits_strategy(G) -> dict:
         hubs, _ = nx.hits(G.to_directed(), max_iter=500, normalized=True)
     return {n: hubs.get(n, 0.0) for n, d in G.nodes(data=True) if _is_active(d)}
 
-# 2) 自实现版本（线性 HITS，基于二部 biadjacency 迭代）
+# 2) Custom implementation (linear HITS, based on bipartite biadjacency iteration)
 def hits_strategy_scratch(G, max_iter: int = 1000, tol: float = 1e-9) -> dict:
     """
-    标准线性 HITS 的教学实现：
-      h <- B a; a <- B^T h，每步 L2 归一化；返回 active 节点的 hub 向量 h。
-    要求图能区分 active/passive（通过 type 或 bipartite）。
+    Standard linear HITS pedagogical implementation:
+      h <- B a; a <- B^T h, L2 normalisation at each step; returns hub vector h for active nodes.
+    Requires graph to distinguish active/passive (via type or bipartite).
     """
     active = _active_nodes(G)
     passive = _passive_nodes(G)
     if not active or not passive:
-        # 若没有分侧信息，退回库版本
+        # If no side information, fall back to library version
         return hits_strategy(G)
 
-    # 构造 biadjacency 矩阵 B (active x passive)
+    # Build biadjacency matrix B (active x passive)
     a_index = {n: i for i, n in enumerate(active)}
     p_index = {n: i for i, n in enumerate(passive)}
     B = np.zeros((len(active), len(passive)), dtype=float)
@@ -57,7 +57,7 @@ def hits_strategy_scratch(G, max_iter: int = 1000, tol: float = 1e-9) -> dict:
         elif v in a_index and u in p_index:
             B[a_index[v], p_index[u]] = 1.0
 
-    # 线性迭代
+    # Linear iteration
     h = np.ones(len(active))
     a = np.ones(len(passive))
 

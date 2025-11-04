@@ -4,26 +4,26 @@ from scipy.sparse import csr_matrix
 
 
 # ==========================================================
-# =============== 工具函数 =================================
+# =============== Helper Functions =========================
 # ==========================================================
 
 def build_sparse_matrix(graph: Dict[str, List[str]], all_nodes=None):
     """
-    构建稀疏列随机转移矩阵 (csr_matrix)。
+    Build a sparse column-stochastic transition matrix (csr_matrix).
 
-    参数
+    Parameters
     ----------
     graph : Dict[str, List[str]]
-        邻接表，graph[u] = [v1, v2, ...] 表示 u → v。
-    all_nodes : List[str], 可选
-        节点顺序；若为 None，则自动从 graph 中提取。
+        Adjacency list, graph[u] = [v1, v2, ...] means u → v.
+    all_nodes : List[str], optional
+        Node ordering; if None, extract from graph automatically.
 
-    返回
-    ----------
+    Returns
+    -------
     P : csr_matrix
-        列随机转移矩阵，使得 P[v,u] = 1/out_degree(u)
+        Column-stochastic transition matrix where P[v,u] = 1/out_degree(u)
     nodes : List[str]
-        节点顺序
+        Node ordering
     """
     if all_nodes is None:
         all_nodes = list(graph.keys())
@@ -31,7 +31,7 @@ def build_sparse_matrix(graph: Dict[str, List[str]], all_nodes=None):
 
     rows, cols, data = [], [], []
     for u, vs in graph.items():
-        if not vs:  # 悬挂节点（dead-end）
+        if not vs:  # dangling node (dead-end)
             for v in all_nodes:
                 rows.append(idx[v])
                 cols.append(idx[u])
@@ -48,19 +48,19 @@ def build_sparse_matrix(graph: Dict[str, List[str]], all_nodes=None):
 
 def normalize_columns(M: np.ndarray) -> np.ndarray:
     """
-    按列归一化矩阵，使每列和为 1（列随机矩阵）。
+    Normalize each column so that the matrix becomes column-stochastic.
 
-    对出度为 0 的列（悬挂节点）平均分配到所有行。
+    Columns with zero out-degree (dangling nodes) are distributed evenly.
 
-    参数
+    Parameters
     ----------
     M : np.ndarray
-        任意矩阵
+        Any matrix
 
-    返回
-    ----------
+    Returns
+    -------
     M_norm : np.ndarray
-        列归一后的矩阵
+        Column-normalized matrix
     """
     col_sum = M.sum(axis=0, keepdims=True)
     zero_cols = (col_sum == 0)
@@ -71,7 +71,7 @@ def normalize_columns(M: np.ndarray) -> np.ndarray:
 
 
 # ==========================================================
-# =============== 单侧 PageRank ============================
+# =============== Standard PageRank ========================
 # ==========================================================
 
 def pageRank(graph: Dict[str, List[str]],
@@ -79,29 +79,29 @@ def pageRank(graph: Dict[str, List[str]],
              max_iter: int = 100,
              tol: float = 1e-6) -> Dict[str, float]:
     """
-    标准 PageRank 算法（稀疏矩阵实现）。
+    Standard PageRank algorithm (sparse matrix implementation).
 
-    参数
+    Parameters
     ----------
     graph : Dict[str, List[str]]
-        邻接表，graph[u] = [v1, v2, ...] 表示 u → v。
+        Adjacency list, graph[u] = [v1, v2, ...] means u → v.
     alpha : float
-        阻尼系数（通常取 0.85）
+        Damping factor (commonly 0.85)
     max_iter : int
-        最大迭代次数
+        Maximum number of iterations
     tol : float
-        收敛阈值（L1 范数）
+        Convergence threshold (L1 norm)
 
-    返回
-    ----------
+    Returns
+    -------
     ranks : Dict[str, float]
-        各节点的 PageRank 值
+        PageRank value of each node
     """
     P, nodes = build_sparse_matrix(graph)
     n = len(nodes)
 
-    r = np.ones(n) / n                       # 初始化
-    teleport = np.ones(n) / n                # 随机跳转向量
+    r = np.ones(n) / n                       # initial vector
+    teleport = np.ones(n) / n                # teleportation vector
 
     for _ in range(max_iter):
         r_prev = r.copy()
@@ -114,7 +114,7 @@ def pageRank(graph: Dict[str, List[str]],
 
 
 # ==========================================================
-# =============== 二部图 BiPageRank ========================
+# =============== Bipartite BiPageRank =====================
 # ==========================================================
 
 def biPageRank(W_AP: np.ndarray,
@@ -123,51 +123,51 @@ def biPageRank(W_AP: np.ndarray,
                max_iter: int = 100,
                tol: float = 1e-7):
     """
-    BiPageRank 算法（二部图 PageRank）。
+    BiPageRank algorithm for bipartite graphs.
 
-    参数
+    Parameters
     ----------
     W_AP : np.ndarray, shape (n_a, n_p)
-        A → P 的邻接矩阵 (1 表示有边)
+        Adjacency matrix from active to passive nodes (1 means an edge)
     alpha_a : float
-        Active 侧阻尼系数
+        Damping factor on the active side
     alpha_p : float
-        Passive 侧阻尼系数
+        Damping factor on the passive side
     max_iter : int
-        最大迭代次数
+        Maximum number of iterations
     tol : float
-        收敛阈值（L1 范数）
+        Convergence threshold (L1 norm)
 
-    返回
-    ----------
+    Returns
+    -------
     R_A : np.ndarray
-        Active 节点的 PageRank 值
+        PageRank values for active nodes
     R_P : np.ndarray
-        Passive 节点的 PageRank 值
+        PageRank values for passive nodes
     """
     n_a, n_p = W_AP.shape
 
-    # 构建列随机转移矩阵
+    # Build column-stochastic transition matrices
     P_PA = normalize_columns(W_AP.T)  # P <- A
     P_AP = normalize_columns(W_AP)    # A <- P
 
-    # 初始化
+    # Initialise scores
     R_A = np.ones(n_a) / n_a
     R_P = np.ones(n_p) / n_p
 
-    # 迭代更新
+    # Iterative updates
     for _ in range(max_iter):
         R_A_prev, R_P_prev = R_A.copy(), R_P.copy()
 
-        # 交替传播：P→A, A→P
+        # Alternate propagation: P→A, A→P
         R_A = (1 - alpha_a) / n_a + alpha_a * (P_AP @ R_P_prev)
         R_P = (1 - alpha_p) / n_p + alpha_p * (P_PA @ R_A_prev)
 
-        # 归一化
+        # Normalise
         R_A /= R_A.sum()
         R_P /= R_P.sum()
 
-        # 收敛检测
+        # Convergence check
         diff = np.sum(np.abs(R_A - R_A_prev)) + np.sum(np.abs(R_P - R_P_prev))
         if diff < tol:
             break
@@ -176,11 +176,11 @@ def biPageRank(W_AP: np.ndarray,
 
 
 # ==========================================================
-# =============== 示例与测试 ===============================
+# =============== Examples & Tests =========================
 # ==========================================================
 
 if __name__ == "__main__":
-    # ---------- 单侧 PageRank 示例 ----------
+    # ---------- Single-side PageRank example ----------
     graph = {
         'A': ['B', 'C'],
         'B': ['C'],
@@ -191,11 +191,11 @@ if __name__ == "__main__":
     for k, v in ranks.items():
         print(f"  {k}: {v:.4f}")
 
-    # ---------- 二部图 BiPageRank 示例 ----------
+    # ---------- Bipartite BiPageRank example ----------
     # A1, A2 -> P1, P2, P3
     W_AP = np.array([
-        [1, 1, 0],  # A1 链接到 P1, P2
-        [0, 1, 1],  # A2 链接到 P2, P3
+        [1, 1, 0],  # A1 connects to P1, P2
+        [0, 1, 1],  # A2 connects to P2, P3
     ], dtype=float)
 
     R_A, R_P = biPageRank(W_AP, alpha_a=0.8, alpha_p=0.9)

@@ -6,15 +6,15 @@ __all__ = ["score_random"]
 
 def score_random( G: nx.Graph, rng: random.Random | None = None,) -> Dict[str, float]:
     """
-    为所有的点添加随机分数，适配其他算法
+    Assign random scores to all nodes, compatible with other algorithms.
 
-    参数：
-    G : 当前图
-    rng : random参数可以为空
+    Parameters:
+    G : current graph
+    rng : random parameter, can be None
 
-    返回：
+    Returns:
     Dict[str, float]
-        形如 {节点: 随机分} 的字典。
+        Dictionary of the form {node: random_score}.
     """
     r = rng if rng is not None else random   
     result = {}

@@ -3,11 +3,11 @@
 """
 MusRank Interaction Matrix Plot
 -------------------------------
-根据 MusRank 排序后的 I–V 结果，绘制网络的交互矩阵：
-- 横轴：被动节点（passive / plant），按 V_P 递增排序
-- 纵轴：主动节点（active / pollinator），按 I_A 递减排序
-- 蓝色方块：存在 A–P 连接（G.has_edge）
-可用于重现论文 Figure 5 的紧凑嵌套结构图。
+Plot the interaction matrix of the network based on MusRank-ordered I-V results:
+- X-axis: passive nodes (passive / plant), sorted by V_P in ascending order
+- Y-axis: active nodes (active / pollinator), sorted by I_A in descending order
+- Blue squares: A-P connections exist (G.has_edge)
+Can be used to reproduce the compact nested structure figure (Figure 5) from the paper.
 """
 
 import os
@@ -19,7 +19,7 @@ from musrank_strategy import musrank
 
 
 # ============================================================
-# 加载 JSON 文件并构建二部网络
+# Load JSON file and build bipartite network
 # ============================================================
 def load_graph_from_json(json_path):
     with open(json_path, "r", encoding="utf-8") as f:
@@ -58,28 +58,28 @@ def load_graph_from_json(json_path):
 
 
 # ============================================================
-# 生成矩阵点图
+# Generate matrix scatter plot
 # ============================================================
 def plot_musrank_matrix(G, I_scores, V_scores, title="", save_path=None):
-    """根据 MusRank 排序结果绘制交互矩阵（紧凑图）"""
+    """Plot interaction matrix based on MusRank ordering (compact figure)"""
     actives = [n for n, d in G.nodes(data=True) if d.get("bipartite") == 0]
     passives = [n for n, d in G.nodes(data=True) if d.get("bipartite") == 1]
 
-    # 按 I_A 从大到小排列 actives，按 V_P 从小到大排列 passives
+    # Sort actives by I_A descending, passives by V_P ascending
     sorted_A = sorted(actives, key=lambda n: -I_scores.get(n, 0))
     sorted_P = sorted(passives, key=lambda n: V_scores.get(n, 0))
 
-    # 构建邻接矩阵 (binary)
+    # Build adjacency matrix (binary)
     M = np.zeros((len(sorted_A), len(sorted_P)))
     for i, a in enumerate(sorted_A):
         for j, p in enumerate(sorted_P):
             if G.has_edge(a, p):
                 M[i, j] = 1
 
-    # 绘制点图（类似 Figure 5）
+    # Plot scatter (similar to Figure 5)
     plt.figure(figsize=(6, 6))
     rows, cols = np.where(M > 0)
-    plt.scatter(cols, len(sorted_A) - 1 - rows, s=10, color="#1f77b4", marker='s')  # 翻转 y 轴顺序
+    plt.scatter(cols, len(sorted_A) - 1 - rows, s=10, color="#1f77b4", marker='s')  # flip y-axis order
     plt.xlim(-1, len(sorted_P))
     plt.ylim(-1, len(sorted_A))
     plt.xlabel("Passive nodes (Plants, increasing vulnerability)")
@@ -95,7 +95,7 @@ def plot_musrank_matrix(G, I_scores, V_scores, title="", save_path=None):
 
 
 # ============================================================
-# 主函数入口
+# Main entry point
 # ============================================================
 if __name__ == "__main__":
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -112,7 +112,7 @@ if __name__ == "__main__":
 
     for name, path in datasets.items():
         if not os.path.exists(path):
-            print(f"[WARN] {name}: 文件不存在，跳过。")
+            print(f"[WARN] {name}: file does not exist, skipping.")
             continue
 
         G = load_graph_from_json(path)
