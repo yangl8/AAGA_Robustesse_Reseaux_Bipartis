@@ -34,6 +34,7 @@ AAGA_Robustesse_Reseaux_Bipartis/
 │   └── network_prunus.json     # Réseau écologique Prunus
 │
 ├── .gitignore
+├── run_all.sh        # Script Bash pour exécuter automatiquement toutes les expériences
 └── README.md
 ```
 ---
@@ -77,9 +78,21 @@ Chaque fichier est au format **JSON** et contient deux sections : les **nœuds**
 | `value` | float | Poids ou importance du nœud |
 | `source / target` | string | Identifiants des deux extrémités d'un lien |
 
+
+
 ---
 
 ## Installation et exécution
+---
+
+### Exécution automatique
+
+Pour lancer toutes les expériences d’un seul coup :
+
+```bash
+bash run_all.sh
+```
+
 ### 1. Création d’un environnement virtuel
 ```
 python3 -m venv .venv
