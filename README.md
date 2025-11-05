@@ -29,9 +29,9 @@ AAGA_Robustesse_Reseaux_Bipartis/
 │
 ├── tests/
 │   ├── figure/                     # Figures générées (visualisations, courbes)
-│   └── results/
-│       ├── network_pollinator.json # Réseau écologique Pollinator
-│       └── network_prunus.json     # Réseau écologique Prunus
+│   └── results/                #Les résultats des expériences.
+│   ├── network_pollinator.json # Réseau écologique Pollinator
+│   └── network_prunus.json     # Réseau écologique Prunus
 │
 ├── .gitignore
 └── README.md
